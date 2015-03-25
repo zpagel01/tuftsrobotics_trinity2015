@@ -5,11 +5,10 @@
 #include "fireSensorArray.h"
 
 //DEFINE ALL PINS HERE
-#if IS_DELUX
-  #define lineSensePin           A0
-  #define distRightBackPin      A12
-  #define distRightFrontPin     A11
-  #define distFrontPin          A10
+  #define lineSensePin           A5
+  #define distRightBackPin      A13
+  #define distRightFrontPin     A15
+  #define distFrontPin          A14
   #define fireSensePin1         A1
   #define fireSensePin2         A3
   #define fireSensePin3         A0
@@ -24,33 +23,10 @@
   #define rightMotordig          2
   #define rightMotorpwm          3
   
-#else
-
-  #define lineLeftPin           A0
-  #define lineRightPin          A1
-  #define distRightBackPin      A12
-  #define distRightFrontPin     A11
-  #define distFrontPin          A10
-  #define distLeftBackPin       A14
-  #define distLeftFrontPin      A13
-  #define fireSensePin1         A2
-  #define fireSensePin2         A2
-  #define fireSensePin3         A2
-  #define fireSensePin4         -1
-  #define fireSensePin5         -1
-  #define startButton           9
-  #define servoPin              10
-
-  //Motor pins
-  #define leftMotordig           4
-  #define leftMotorpwm           5
-  #define rightMotordig          7
-  #define rightMotorpwm          6
-#endif
 
 //IS SERIAL COMM NEEDED?
 //THIS FUCKS UP TIMING SOM'M BAD
-#define DEBUG                 0
+#define DEBUG                 1
 
 //Possible States
 #define STARTPUSHED           8
@@ -59,7 +35,6 @@
 #define INROOM                2
 #define FOUNDFIRE             3
 #define RETURNHOME            4
-#define ALIGNLINE             5
 #define PUTOUTFIRE            6
 #define ALIGNFIRE             7
 #define HOMEREACHED           9
@@ -121,30 +96,27 @@ void setup() {
   pullServo.attach(10);
   pullServo.write(SERVO_LOOSE);
   
-  //Get left motor in proper orientation
+  //Flip both motors
   leftMotor.flip();
+  rightMotor.flip();
   
   //Give these motors to the motor controller for wall following
   mcontrol.attach(&leftMotor,&rightMotor);
   
   //Initialize array of fire sense pins
   //and pass it to the fire sensor array object
-  int fireSensePins[3] = {fireSensePin1,fireSensePin2,fireSensePin3};
+  int fireSensePins[5] = {fireSensePin1,fireSensePin2,fireSensePin3,fireSensePin4,fireSensePin5};
   fireSense.attach(fireSensePins);
-  fireSense.flip();
   
   
   #if DEBUG
     Serial.begin(9600);
   #endif
   
-  pinMode(lineLeftPin,INPUT);
-  pinMode(lineRightPin,INPUT);
+  pinMode(lineSensePin,INPUT);
   pinMode(distRightBackPin,INPUT);
   pinMode(distRightFrontPin,INPUT);
   pinMode(distFrontPin,INPUT);
-  pinMode(distLeftBackPin,INPUT);
-  pinMode(distLeftFrontPin,INPUT);
   pinMode(startButton,INPUT);
   
   //Wait for serial to begin
@@ -154,7 +126,7 @@ void setup() {
   #endif
   
   //Wait for start button
-  while(digitalRead(startButton)==LOW){
+  while(false && digitalRead(startButton)==LOW){
     if(millis()%1000==0){
       sensorDiagnostics();
     }
@@ -165,10 +137,9 @@ void setup() {
 }
 
 //These declarations are for line adjustment
-int lineLeft,lineRight;
-boolean lineLeftSensed, lineRightSensed;
-int rLineSide = LINE_INFRONT;   //Constants define
-int lLineSide = LINE_INFRONT;   //at top of code
+
+boolean lineSensed;
+int lineVal;
 //END DECLARATIONS FOR LINE ADJUSTMENT
 
 //These declarations are for fire sensing
@@ -192,7 +163,23 @@ int numRoomsChecked = 0;
 unsigned long time = 0;
 unsigned long startTime = millis();
 unsigned long stateStart = 0;
-void loop() {
+
+void loop(){
+  while(true){
+    //statemachine();
+    //sensorDiagnostics();
+    testRotation();
+  }
+}
+
+void testRotation(){
+  rotCW90();
+  delay(1000);
+  rotCCW90();
+  delay(2000);
+}
+
+void statemachine() {
   //while(1) Serial.println("Test2");
   switch(STATE){
     case STARTPUSHED:
@@ -272,7 +259,7 @@ void loop() {
           }
         }
       #else
-        if(analogRead(lineLeftPin)<LINESENSED || analogRead(lineRightPin)<LINESENSED){
+        if(analogRead(lineSensePin)<LINESENSED){
           //STATE = ALIGNLINE;
           rightMotor.brake();
           leftMotor.brake();
@@ -282,16 +269,13 @@ void loop() {
           delay(400);                                        //the line and not mistakenly
           leftMotor.brake();                                 //reading the start pad
           rightMotor.brake();
-          lineLeft  = analogRead(lineLeftPin);
-          lineRight = analogRead(lineRightPin);
+          lineVal  = analogRead(lineSensePin);
           #if LINESENSING_INVERTED
-            lineLeftSensed  = (lineLeft  > LINESENSED);
-            lineRightSensed = (lineRight > LINESENSED);
+            lineSensed  = (lineVal  > LINESENSED);
           #else
-            lineLeftSensed  = (lineLeft  < LINESENSED);
-            lineRightSensed = (lineRight < LINESENSED);
+            lineSensed  = (lineVal  < LINESENSED);
           #endif
-          if(!lineLeftSensed && !lineRightSensed){
+          if(!lineSensed){
             numRoomsChecked++;
             STATE = INROOM;
             leftMotor.brake();
@@ -306,120 +290,6 @@ void loop() {
           }
         }
       #endif
-      
-      break;
-     
-    
-    case ALIGNLINE:
-      
-      lineLeft  = analogRead(lineLeftPin);
-      lineRight = analogRead(lineRightPin);
-      
-      #if LINESENSING_INVERTED
-        lineLeftSensed  = (lineLeft  > LINESENSED);
-        lineRightSensed = (lineRight > LINESENSED);
-      #else
-        lineLeftSensed  = (lineLeft  < LINESENSED);
-        lineRightSensed = (lineRight < LINESENSED);
-      #endif
-      /*
-      Serial.print("Left line side: ");
-      Serial.println(lLineSide);
-      Serial.print("Right line side: ");
-      Serial.println(rLineSide);
-      */
-      
-      //Currently on the line on right side?
-      if(rLineSide == ON_LINE){
-        
-        //If moving forward, moving past line -> LINE_BEHIND
-        //If moving backward, moving past line -> LINE_INFRONT
-                                   
-        //This is done in case the robot is about to
-        //go back off the line, so we know what side
-        //of the line it must be on when it does
-        
-        if(rightMotor.isMovingForward()){
-          rLineSide = LINE_BEHIND;
-        }
-        else{
-          rLineSide = LINE_INFRONT;
-        }
-                                   
-      }
-      if (lLineSide == ON_LINE){
-        if(leftMotor.isMovingForward()){         //Ditto
-          lLineSide = LINE_BEHIND;
-        }
-        else{
-          lLineSide = LINE_INFRONT;
-        }
-      }
-      
-      if (lineRightSensed){        //If we are still on the line, store that fact
-        rLineSide = ON_LINE;
-      }
-      if (lineLeftSensed){         //...and for the left side too
-        lLineSide = ON_LINE;
-      }
-      
-      if (rLineSide == ON_LINE && lLineSide == ON_LINE){   //Both sides on line!
-        #if DEBUG
-          Serial.println("ALIGNED WITH LINE!!");
-        #endif
-        rightMotor.brake();
-        leftMotor.brake();
-        delay(200);                                        //Pause
-        leftMotor.drive(80);                               //Drive forward slightly to
-        rightMotor.drive(80);                              //verify that we are now off
-        delay(400);                                        //the line and not mistakenly
-        leftMotor.brake();                                 //reading the start pad
-        rightMotor.brake();
-        lineLeft  = analogRead(lineLeftPin);
-        lineRight = analogRead(lineRightPin);
-        #if LINESENSING_INVERTED
-          lineLeftSensed  = (lineLeft  > LINESENSED);
-          lineRightSensed = (lineRight > LINESENSED);
-        #else
-          lineLeftSensed  = (lineLeft  < LINESENSED);
-          lineRightSensed = (lineRight < LINESENSED);
-        #endif
-        if(lineRightSensed && lineLeftSensed){             //If line still sensed, we're on pad
-          STATE = WALLFOLLOW;                              //so continue wall following
-        }
-        else{
-          STATE = INROOM;                                  //otherwise, we sensed a line!
-        }
-        stateStart = time;
-      }
-      
-      
-      //Drive motors appropriately
-      if(rLineSide == LINE_INFRONT){        //If right side behind line...
-        rightMotor.drive(LINE_ADJ_SPEED);   //...drive right side forward
-        if(lLineSide == ON_LINE){           //..and if left side on line...
-          leftMotor.drive(-LINE_ADJ_SPEED-20); //...drive left side opposite to stay in place
-        }
-      }
-      if(rLineSide == LINE_BEHIND){         //If right side in front of line...
-        rightMotor.drive(-LINE_ADJ_SPEED);  //...drive right side backward
-        if(lLineSide == ON_LINE){           //..and if left side on line...
-          leftMotor.drive(LINE_ADJ_SPEED+20);  //...drive left side opposite to stay in place
-        }
-      }
-      if(lLineSide == LINE_INFRONT){        //If left side behind line...
-        leftMotor.drive(LINE_ADJ_SPEED);    //...drive left side forward
-        if(rLineSide == ON_LINE){           //and if right side on line...
-          rightMotor.drive(-LINE_ADJ_SPEED-20);//...drive right side opposite to stay in place
-        }
-      }
-      if(lLineSide == LINE_BEHIND){         //If left side in front of line...
-        leftMotor.drive(-LINE_ADJ_SPEED);   //...drive left backward
-        if(rLineSide == ON_LINE){           //and if right side on line...
-          rightMotor.drive(LINE_ADJ_SPEED+20); //...drive right side opposite to stay in place
-        }
-      }
-        
       
       break;
       
@@ -540,69 +410,12 @@ void loop() {
       break;
       
     case RETURNHOME:
-      //Serial.println("WALL FOLLOWING");
-      //Look for front obstacles:
-      //Is there something in front of me? If so, rotate 90 CCW
-      if(avgSensorVal(distFrontPin,3)>FRONTOBSTACLEDIST){
-        rotCW90();
-      }
-      mcontrol.drive(analogRead(distLeftFrontPin),analogRead(distLeftBackPin),180);
-      
-      
-      //Look for lines. If found, change state to aligning with line
-      #if LINESENSING_INVERTED
-        if(analogRead(lineLeftPin)>LINESENSED || analogRead(lineRightPin)>LINESENSED){
-          rightMotor.brake();
-          leftMotor.brake();
-          delay(200);                                        //Pause
-          leftMotor.drive(80);                               //Drive forward slightly to
-          rightMotor.drive(80);                              //verify that we are now off
-          delay(400);                                        //the line and not mistakenly
-          leftMotor.brake();                                 //reading the start pad
-          rightMotor.brake();
-          lineLeft  = analogRead(lineLeftPin);
-          lineRight = analogRead(lineRightPin);
-          #if LINESENSING_INVERTED
-            lineLeftSensed  = (lineLeft  > LINESENSED);
-            lineRightSensed = (lineRight > LINESENSED);
-          #else
-            lineLeftSensed  = (lineLeft  < LINESENSED);
-            lineRightSensed = (lineRight < LINESENSED);
-          #endif
-          if(lineLeftSensed || lineRightSensed){
-            STATE = HOMEREACHED;
-          }
-        }
-      #else
-        if(analogRead(lineLeftPin)<LINESENSED || analogRead(lineRightPin)<LINESENSED){
-          rightMotor.brake();
-          leftMotor.brake();
-          delay(200);                                        //Pause
-          leftMotor.drive(80);                               //Drive forward slightly to
-          rightMotor.drive(80);                              //verify that we are now off
-          delay(400);                                        //the line and not mistakenly
-          leftMotor.brake();                                 //reading the start pad
-          rightMotor.brake();
-          lineLeft  = analogRead(lineLeftPin);
-          lineRight = analogRead(lineRightPin);
-          #if LINESENSING_INVERTED
-            lineLeftSensed  = (lineLeft  > LINESENSED);
-            lineRightSensed = (lineRight > LINESENSED);
-          #else
-            lineLeftSensed  = (lineLeft  < LINESENSED);
-            lineRightSensed = (lineRight < LINESENSED);
-          #endif
-          if(lineLeftSensed || lineRightSensed){
-            STATE = HOMEREACHED;
-          }
-        }
-      #endif
-      
-      break;
-      
-      case HOMEREACHED:
-      
-      break;
+
+    break;
+    
+    case HOMEREACHED:
+    
+    break;
   }
   diagTimeCount++;
   if(diagTimeCount>2000){
@@ -619,21 +432,24 @@ void sensorDiagnostics(){
     Serial.println("------------Printing robot information------------");
     
     Serial.print("LINE SENSOR - Left:            ");
-    Serial.println(analogRead(lineLeftPin));
-    
-    Serial.print("LINE SENSOR - Right:           ");
-    Serial.println(analogRead(lineRightPin));
+    Serial.println(analogRead(lineSensePin));
     
     Serial.println();
     
-    Serial.print("FIRE SENSOR - Left:              ");
+    Serial.print("FIRE SENSOR - 1:              ");
     Serial.println(analogRead(fireSensePin1));
     
-    Serial.print("FIRE SENSOR - Center:            ");
+    Serial.print("FIRE SENSOR - 2:            ");
     Serial.println(analogRead(fireSensePin2));
     
-    Serial.print("FIRE SENSOR - Right:             ");
+    Serial.print("FIRE SENSOR - 3:             ");
     Serial.println(analogRead(fireSensePin3));
+    
+    Serial.print("FIRE SENSOR - 4:             ");
+    Serial.println(analogRead(fireSensePin4));
+    
+    Serial.print("FIRE SENSOR - 5:             ");
+    Serial.println(analogRead(fireSensePin5));
     
     Serial.println();
     
@@ -644,12 +460,6 @@ void sensorDiagnostics(){
     Serial.println(fireSense.fireStrength());
     
     Serial.println();
-    
-    Serial.print("DISTANCE SENSOR - Left-Back:   ");
-    Serial.println(analogRead(distLeftBackPin));
-    
-    Serial.print("DISTANCE SENSOR - Left-Front:  ");
-    Serial.println(analogRead(distLeftFrontPin));
     
     Serial.print("DISTANCE SENSOR - Right-Back:  ");
     Serial.println(analogRead(distRightBackPin));
@@ -670,16 +480,20 @@ void sensorDiagnostics(){
 
 //Rotate clockwise 90 degrees
 void rotCW90(){
-  leftMotor.drive(255);
-  rightMotor.drive(-255);
-  delay(1000);
+  leftMotor.drive(150);
+  rightMotor.drive(-150);
+  delay(550);
+  leftMotor.brake();
+  rightMotor.brake();
 }
 
 //Rotate counterclockwise 90 degrees
 void rotCCW90(){
-  leftMotor.drive(-255);
-  rightMotor.drive(255);
-  delay(1000);
+  leftMotor.drive(-150);
+  rightMotor.drive(150);
+  delay(630);
+  leftMotor.brake();
+  rightMotor.brake();
 }
 
 void leaveRoom(){
