@@ -4,31 +4,25 @@
 #include "motorcontrol.h"
 #include "fireSensorArray.h"
 
-//Set 0 if this bot is "Irrelephant"
-#define IS_JUMBOLT              1
-
 //DEFINE ALL PINS HERE
 #if IS_DELUX
-  #define lineLeftPin           A0
-  #define lineRightPin          A1
+  #define lineSensePin           A0
   #define distRightBackPin      A12
   #define distRightFrontPin     A11
   #define distFrontPin          A10
-  #define distLeftBackPin       A14
-  #define distLeftFrontPin      A13
-  #define fireSensePin1         A3
-  #define fireSensePin2         A4
-  #define fireSensePin3         A2
-  #define fireSensePin4         -1
-  #define fireSensePin5         -1
+  #define fireSensePin1         A1
+  #define fireSensePin2         A3
+  #define fireSensePin3         A0
+  #define fireSensePin4         A4
+  #define fireSensePin5         A2
   #define startButton           8
-  #define servoPin              10
+  #define servoPin              9
 
   //Motor pins
   #define leftMotordig           4
   #define leftMotorpwm           5
-  #define rightMotordig          7
-  #define rightMotorpwm          6
+  #define rightMotordig          2
+  #define rightMotorpwm          3
   
 #else
 
@@ -623,13 +617,6 @@ void loop() {
 void sensorDiagnostics(){
   #if DEBUG
     Serial.println("------------Printing robot information------------");
-    
-    Serial.print("ROBOT MONICKER:                 ");
-    if(IS_DELUX){
-      Serial.println("Delux");
-    } else {
-      Serial.println("Irrelephant");
-    }
     
     Serial.print("LINE SENSOR - Left:            ");
     Serial.println(analogRead(lineLeftPin));

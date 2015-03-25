@@ -27,7 +27,7 @@ void Motor::drive(int speed){
 	if(!flipped){
 		if(speed>=0){
 			digitalWrite(digPin,HIGH);
-			analogWrite(pwmPin,abs_speed);
+			analogWrite(pwmPin,255-abs_speed);
 		} else {
 			digitalWrite(digPin,LOW);
 			analogWrite(pwmPin,abs_speed);
@@ -38,7 +38,7 @@ void Motor::drive(int speed){
 			analogWrite(pwmPin,abs_speed);
 		} else {
 			digitalWrite(digPin,HIGH);
-			analogWrite(pwmPin,abs_speed);
+			analogWrite(pwmPin,255-abs_speed);
 		}
 	}
 }
