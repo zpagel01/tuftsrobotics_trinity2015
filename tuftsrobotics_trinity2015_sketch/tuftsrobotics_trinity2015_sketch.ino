@@ -242,69 +242,18 @@ void statemachine() {
       
       //Look for lines. If found, change state to aligning with line
       #if LINESENSING_INVERTED
-        if(analogRead(lineLeftPin)>LINESENSED || analogRead(lineRightPin)>LINESENSED){
-          //STATE = ALIGNLINE;
-          rightMotor.brake();
-          leftMotor.brake();
-          delay(200);                                        //Pause
-          leftMotor.drive(80);                               //Drive forward slightly to
-          rightMotor.drive(80);                              //verify that we are now off
-          delay(400);                                        //the line and not mistakenly
-          leftMotor.brake();                                 //reading the start pad
-          rightMotor.brake();
-          lineLeft  = analogRead(lineLeftPin);
-          lineRight = analogRead(lineRightPin);
-          #if LINESENSING_INVERTED
-            lineLeftSensed  = (lineLeft  > LINESENSED);
-            lineRightSensed = (lineRight > LINESENSED);
-          #else
-            lineLeftSensed  = (lineLeft  < LINESENSED);
-            lineRightSensed = (lineRight < LINESENSED);
-          #endif
-          if(!(lineLeftSensed && lineRightSensed)){
-            numRoomsChecked++;
-            STATE = INROOM;
-            leftMotor.brake();
-            rightMotor.brake();
-            stateStart = time;
-            #if DEBUG
-              Serial.println("Changed state to ALIGNLINE");
-            #endif
-          }
-          else{
-            STATE = INITIALIZATION; //We're on the pad again, so get off it
-          }
-        }
+        if(analogRead(lineSensePin)>LINESENSED){
       #else
         if(analogRead(lineSensePin)<LINESENSED){
-          //STATE = ALIGNLINE;
+      #endif
           rightMotor.brake();
           leftMotor.brake();
-          delay(200);                                        //Pause
-          leftMotor.drive(80);                               //Drive forward slightly to
-          rightMotor.drive(80);                              //verify that we are now off
-          delay(400);                                        //the line and not mistakenly
-          leftMotor.brake();                                 //reading the start pad
-          rightMotor.brake();
-          lineVal  = analogRead(lineSensePin);
-          #if LINESENSING_INVERTED
-            lineSensed  = (lineVal  > LINESENSED);
-          #else
-            lineSensed  = (lineVal  < LINESENSED);
+          numRoomsChecked++;
+          STATE = INROOM;
+          stateStart = time;
+          #if DEBUG
+            Serial.println("Changed state to INROOM");
           #endif
-          if(!lineSensed){
-            numRoomsChecked++;
-            STATE = INROOM;
-            leftMotor.brake();
-            rightMotor.brake();
-            stateStart = time;
-            #if DEBUG
-              Serial.println("Changed state to ALIGNLINE");
-            #endif
-          }
-          else{
-            STATE = INITIALIZATION; //We're on the pad again, so get off it
-          }
         }
       #endif
       
