@@ -53,10 +53,6 @@
   #define LINESENSED            45
 #endif
 
-#define LINE_INFRONT          0
-#define LINE_BEHIND           1
-#define ON_LINE               2
-#define LINE_ADJ_SPEED        80
 
 //Fire sensing constants
 #define FIRESENSED            34
