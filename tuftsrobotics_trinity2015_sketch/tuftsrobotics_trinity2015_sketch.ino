@@ -42,7 +42,7 @@
 #define INITIALIZATION_TIME   5500
 
 //Wall-follow constants
-#define FRONTOBSTACLEDIST     370
+#define FRONTOBSTACLEDIST     300
 
 //Line sense & alignment constants
 #define LINESENSING_INVERTED  0     //1 = look for black, 0 = look for white
@@ -174,16 +174,15 @@ void loop(){
 }
 
 void testWallFollow(){
-  long rightfront = 0;
-  long rightback = 0;
-  int nSamples = 3;
-  for(int i=0; i<nSamples; i++){
-    rightfront += analogRead(distRightFrontPin);
-    rightback  += analogRead(distRightBackPin);
-  }
-  rightfront /= nSamples;
-  rightback  /= nSamples;
+  int rightfront = avgSensorVal(distRightFrontPin,3);
+  int rightback = avgSensorVal(distRightBackPin,3);
+  int front = avgSensorVal(distFrontPin,3);
+
   mcontrol.drive(rightback,rightfront,255);
+  
+  if(avgSensorVal(distFrontPin,3)>FRONTOBSTACLEDIST){
+    rotCCW90();
+  }
 }
 
 void testRotation(){
