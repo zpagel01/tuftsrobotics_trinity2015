@@ -2,8 +2,8 @@
 #define FIRESENSORARRAY_H
 #include "Arduino.h"
 
-#define NUMFIRESENSORS  3
-#define FIRETHRESHOLD   50
+#define NUMFIRESENSORS  5
+#define FIRETHRESHOLD   60
 
 class FireSensorArray{
 	public:
