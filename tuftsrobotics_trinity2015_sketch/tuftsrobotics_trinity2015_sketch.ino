@@ -183,7 +183,7 @@ void testWallFollow(){
   }
   rightfront /= nSamples;
   rightback  /= nSamples;
-  mcontrol.drive(rightback,rightfront,180);
+  mcontrol.drive(rightback,rightfront,255);
 }
 
 void testRotation(){

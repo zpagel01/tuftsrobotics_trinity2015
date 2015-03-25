@@ -76,7 +76,7 @@ void MotorControl::drive(int p_left, int p_right, int inertia){
       int dist_from_opt = OPT - min(p_left,p_right); //dist_from_opt negative when too close
       int angle = p_right - p_left; //angle positive when pointed at wall
       int ideal_angle = 0.8 * dist_from_opt; //scale??
-      if (ideal_angle >0) ideal_angle = 0.03 * ideal_angle*ideal_angle;
+      if (ideal_angle >0) ideal_angle = 0.03 * (ideal_angle*ideal_angle);
       if (ideal_angle >200) ideal_angle = 200;
       #if DEBUG
         Serial.println(ideal_angle);
@@ -87,9 +87,6 @@ void MotorControl::drive(int p_left, int p_right, int inertia){
       
       
       //angle should be proportional to dist_from_opt
-      if(KP * error + inertia > 255){
-        //inertia = 255 - KP * error;
-      }
       int P_l = KP * error + inertia;
       int P_r = KP * -error + inertia;
       
@@ -97,7 +94,14 @@ void MotorControl::drive(int p_left, int p_right, int inertia){
       int D_r = (r_last-error)*KD;
       int leftSpeed = P_l + D_l;
       int rightSpeed = P_r + D_r;
-      
+      if (leftSpeed > 255){
+        rightSpeed -= (leftSpeed-255);
+        leftSpeed -= (leftSpeed-255);
+      }
+      if (rightSpeed > 255){
+        rightSpeed -= (rightSpeed-255);
+        leftSpeed -= (rightSpeed-255);
+      }      
       motor1->drive(leftSpeed);
       motor2->drive(rightSpeed);
       
