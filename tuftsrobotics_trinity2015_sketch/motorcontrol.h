@@ -12,7 +12,7 @@
 #define KD           0.8
 #define KI           0.3
 
-#define OPT          260
+#define OPT          300
 
 class MotorControl{
 	public:
@@ -32,6 +32,7 @@ class MotorControl{
 		//Give a speed at which to turn in place b/w -255 and 255
 		void spin(int spd);
 		void brake();
+                int sensorToMm(int sensorval);
 	private:
 		Motor* motor1;
 		Motor* motor2;

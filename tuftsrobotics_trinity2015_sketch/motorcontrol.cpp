@@ -73,9 +73,14 @@ void MotorControl::drive(int p_left, int p_right, int inertia){
     l_last = l_error;
     r_last = r_error;
     */
-      int dist_from_opt = OPT - (p_left + p_right)/2; //dist_from_opt negative when too close
+      int dist_from_opt = OPT - min(p_left,p_right); //dist_from_opt negative when too close
       int angle = p_right - p_left; //angle positive when pointed at wall
       int ideal_angle = 0.8 * dist_from_opt; //scale??
+      if (ideal_angle >0) ideal_angle = 0.03 * ideal_angle*ideal_angle;
+      if (ideal_angle >200) ideal_angle = 200;
+      #if DEBUG
+        Serial.println(ideal_angle);
+      #endif
       
       int error = (ideal_angle - angle);
       
@@ -109,7 +114,7 @@ void MotorControl::drive(int p_left, int p_right, int inertia){
     
     int dist_from_opt = OPT - (p_left + p_right)/2; //dist_from_opt negative when too close
       int angle = p_right - p_left; //angle positive when pointed at wall
-      int ideal_angle = 1 * dist_from_opt; //scale??
+      int ideal_angle = 0.1 * dist_from_opt; //scale??
       
       int error = (ideal_angle - angle);
     //derivative error
@@ -145,4 +150,8 @@ void MotorControl::spin(int spd){
 void MotorControl::brake(){
 	motor1->drive(0);
 	motor2->drive(0);
+}
+
+int MotorControl::sensorToMm(int sensorval){
+  return (41395.464 * pow(sensorval, -1.0947));
 }

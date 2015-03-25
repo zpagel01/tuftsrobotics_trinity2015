@@ -26,7 +26,7 @@
 
 //IS SERIAL COMM NEEDED?
 //THIS FUCKS UP TIMING SOM'M BAD
-#define DEBUG                 1
+#define DEBUG                 0
 
 //Possible States
 #define STARTPUSHED           8
@@ -168,8 +168,22 @@ void loop(){
   while(true){
     //statemachine();
     //sensorDiagnostics();
-    testRotation();
+    //testRotation();
+    testWallFollow();
   }
+}
+
+void testWallFollow(){
+  long rightfront = 0;
+  long rightback = 0;
+  int nSamples = 3;
+  for(int i=0; i<nSamples; i++){
+    rightfront += analogRead(distRightFrontPin);
+    rightback  += analogRead(distRightBackPin);
+  }
+  rightfront /= nSamples;
+  rightback  /= nSamples;
+  mcontrol.drive(rightback,rightfront,180);
 }
 
 void testRotation(){
