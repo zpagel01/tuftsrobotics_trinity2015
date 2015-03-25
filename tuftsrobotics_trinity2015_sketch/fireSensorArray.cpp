@@ -29,15 +29,21 @@ boolean FireSensorArray::isThereFire(){
 
 int FireSensorArray::fireAngle(){
   int curMax = 0;
+  int weightedAngle = 0;
+  int total = 0;
   for(int i = 0; i < NUMFIRESENSORS; i++) {
 	int reading = analogRead(fireSensePins[i]);
     if(reading > curMax) {
       curMax = reading;
     }
+	int sensorAngle = map(i,0,NUMFIRESENSORS,-90,90);
+	int weight = reading;
+	int total += reading;
+	weightedAngle += sensorAngle * weight;
   }
-  int angle = map((analogRead(fireSensePins[NUMFIRESENSORS-1]) - analogRead(fireSensePins[0])),-curMax, curMax,-45,45);
-  if(curMax<15) angle=0; //No fire to read, don't give noise back as data
-  return angle;
+  weightedAngle /= total;
+  if(curMax<15) weightedAngle=0; //No fire to read, don't give noise back as data
+  return weightedAngle;
 }
 
 int FireSensorArray::fireStrength(){
