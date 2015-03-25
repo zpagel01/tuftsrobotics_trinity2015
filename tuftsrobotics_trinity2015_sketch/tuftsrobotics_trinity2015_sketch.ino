@@ -26,7 +26,7 @@
 
 //IS SERIAL COMM NEEDED?
 //THIS FUCKS UP TIMING SOM'M BAD
-#define DEBUG                 0
+#define DEBUG                 1
 
 //Possible States
 #define STARTPUSHED           8
@@ -169,7 +169,8 @@ void loop(){
     //statemachine();
     //sensorDiagnostics();
     //testRotation();
-    testWallFollow();
+    //testWallFollow();
+    testLineSensing();
   }
 }
 
@@ -190,6 +191,13 @@ void testRotation(){
   delay(1000);
   rotCCW90();
   delay(2000);
+}
+
+void testLineSensing(){
+  #if DEBUG
+    Serial.println(analogRead(lineSensePin));
+    delay(500);
+  #endif
 }
 
 void statemachine() {
