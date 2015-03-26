@@ -9,13 +9,13 @@
   #define distRightBackPin      A13
   #define distRightFrontPin     A15
   #define distFrontPin          A14
-  #define fireSensePin1         A1
-  #define fireSensePin2         A3
-  #define fireSensePin3         A0
-  #define fireSensePin4         A4
-  #define fireSensePin5         A2
+  #define fireSensePin1         A9
+  #define fireSensePin2         A11
+  #define fireSensePin3         A8
+  #define fireSensePin4         A12
+  #define fireSensePin5         A10
   #define startButton           8
-  #define servoPin              9
+  #define servoPin              10
 
   //Motor pins
   #define leftMotordig           4
@@ -42,7 +42,7 @@
 #define INITIALIZATION_TIME   5500
 
 //Wall-follow constants
-#define FRONTOBSTACLEDIST     300
+#define FRONTOBSTACLEDIST     250
 
 //Line sense & alignment constants
 #define LINESENSING_INVERTED  0     //1 = look for black, 0 = look for white
@@ -56,7 +56,7 @@
 
 //Fire sensing constants
 #define FIRESENSED            34
-#define FIRECLOSE             480
+#define FIRECLOSE             530
 #define FIREANGLETHRESH       4
 #define FIRESWEEPTIME         200
 #define FIRESENSE_TRIALS      10
@@ -89,7 +89,7 @@ void setup() {
   leftMotor.attach(leftMotordig,leftMotorpwm);
   rightMotor.attach(rightMotordig,rightMotorpwm);
   
-  pullServo.attach(10);
+  pullServo.attach(servoPin);
   pullServo.write(SERVO_LOOSE);
   
   //Flip both motors
@@ -139,8 +139,8 @@ int lineVal;
 //END DECLARATIONS FOR LINE ADJUSTMENT
 
 //These declarations are for fire sensing
-int fire_motinertia = 80;//140;
-int fire_motcorrection = 140;
+int fire_motinertia = 120;//140;
+int fire_motcorrection = 3;
 int fAngle = 0;
 int fStrength = 0;
 int maxFireStrength = 0;
@@ -164,11 +164,65 @@ void loop(){
   while(true){
     //statemachine();
     //sensorDiagnostics();
+    //delay(1000);
     //testRotation();
     //testWallFollow();
-    testLineSensing();
+    //testFireSensing();
+    //testLineSensing();
+    //testFireFollow();
+    testServo();
   }
 }
+
+void testServo(){
+  int pos;
+  for(pos = SERVO_LOOSE; pos <= SERVO_TAUT; pos += 1) // goes from 0 degrees to 180 degrees 
+  {                                  // in steps of 1 degree 
+    pullServo.write(pos);              // tell servo to go to position in variable 'pos' 
+    delay(8);                       // waits 15ms for the servo to reach the position
+    Serial.println(pos);
+  }
+  delay(1000);
+  
+  for(pos = SERVO_TAUT; pos>=SERVO_LOOSE; pos -= 1)     // goes from 180 degrees to 0 degrees 
+  {                                
+    pullServo.write(pos);              // tell servo to go to position in variable 'pos' 
+    delay(8);                       // waits 15ms for the servo to reach the position 
+    Serial.println(pos);
+  }
+  delay(1000);
+}
+
+void testFireSensing(){
+  #if DEBUG
+    Serial.println(fireSense.fireAngle());
+    delay(500);
+  #endif
+}
+
+void testFireFollow(){
+  fAngle = fireSense.fireAngle();
+  fStrength = fireSense.fireStrength();
+  
+  #if DEBUG
+    Serial.println(fAngle);
+  #endif
+  
+  
+  if(abs(fAngle) > FIREANGLETHRESH)
+  {
+    leftMotor.drive(fire_motinertia + fire_motcorrection*fAngle);
+    rightMotor.drive(fire_motinertia - fire_motcorrection*fAngle);
+  }
+
+  if(fStrength>=FIRECLOSE){
+    leftMotor.brake();
+    rightMotor.brake();
+    STATE = PUTOUTFIRE;
+    stateStart = time;
+  }
+}
+
 
 void testWallFollow(){
   int rightfront = avgSensorVal(distRightFrontPin,3);
@@ -255,7 +309,6 @@ void statemachine() {
             Serial.println("Changed state to INROOM");
           #endif
         }
-      #endif
       
       break;
       

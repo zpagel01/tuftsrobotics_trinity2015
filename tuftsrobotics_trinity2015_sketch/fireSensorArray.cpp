@@ -28,26 +28,31 @@ boolean FireSensorArray::isThereFire(){
 }
 
 int FireSensorArray::fireAngle(){
-  int curMax = 0;
+  int curMax = -1;
+  int curMaxI = -1;
   long weightedAngle = 0;
   long total = 0;
+  
   for(int i = 0; i < NUMFIRESENSORS; i++) {
-	long reading = analogRead(fireSensePins[i]);
-        /*
-        Serial.print("Sensor ");
-        Serial.print(i);
-        Serial.print(" reads ");
-        Serial.println(reading);
-        */
+    long reading = analogRead(fireSensePins[i]);
     if(reading > curMax) {
       curMax = reading;
+      curMaxI = i;
     }
-	long sensorAngle = map(i,0,NUMFIRESENSORS-1,90,-90);
-        //Serial.print("Sensor's angle: ");
-        //Serial.println(sensorAngle);
-	long weight = reading * reading;
-	total += weight;
-	weightedAngle += sensorAngle * weight;
+  }
+  for (int i=curMaxI-1; i<=curMaxI+1; i++)
+  {
+    if (i>=0 && i<NUMFIRESENSORS){
+      
+        long reading = analogRead(fireSensePins[i]);
+    	long sensorAngle = map(i,0,NUMFIRESENSORS-1,60,-60);
+        long weight = reading;
+	
+        if (weight>FIRETHRESHOLD){
+          total += weight;
+          weightedAngle += sensorAngle * weight;
+        }
+    }
   }
   weightedAngle /= total;
   if(curMax<FIRETHRESHOLD) weightedAngle=0; //No fire to read, don't give noise back as data

@@ -5,6 +5,8 @@ MotorControl::MotorControl(int cType){
         controlType = cType;
         r_last = 0;
         l_last = 0;
+        lspeed_last = 0;
+        rspeed_last = 0;
         I_r = 0;
         I_l = 0;
 }
@@ -92,8 +94,10 @@ void MotorControl::drive(int p_left, int p_right, int inertia){
       
       int D_l = (error-l_last) *KD;
       int D_r = (r_last-error)*KD;
-      int leftSpeed = P_l + D_l;
-      int rightSpeed = P_r + D_r;
+      int D_lspeed = lspeed_last * KDspd;
+      int D_rspeed = rspeed_last * KDspd;
+      int leftSpeed = P_l + D_l - D_lspeed;
+      int rightSpeed = P_r + D_r - D_rspeed;
       if (leftSpeed > 255){
         rightSpeed -= (leftSpeed-255);
         leftSpeed -= (leftSpeed-255);
@@ -107,6 +111,9 @@ void MotorControl::drive(int p_left, int p_right, int inertia){
       
       l_last = error;
       r_last = error;
+      
+      rspeed_last = rightSpeed;
+      lspeed_last = leftSpeed;
       
     
   }

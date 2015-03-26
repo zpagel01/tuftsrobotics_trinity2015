@@ -10,6 +10,7 @@
 
 #define KP           0.8
 #define KD           0.8
+#define KDspd        0.1
 #define KI           0.3
 
 #define OPT          300
@@ -39,6 +40,8 @@ class MotorControl{
                 int controlType;
                 int l_last;
                 int r_last;
+                int lspeed_last;
+                int rspeed_last;
                 float I_l;
                 float I_r;
 };
