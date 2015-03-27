@@ -3,7 +3,6 @@
 #include "motor.h"
 #include "motorcontrol.h"
 #include "fireSensorArray.h"
-#include <FFT.h>
 
 //DEFINE ALL PINS HERE
   #define lineSensePin           A5
@@ -15,9 +14,9 @@
   #define fireSensePin3         A6
   #define fireSensePin4         A4
   #define fireSensePin5         A2
-  #define startButton           8
+  #define startButton           12
   #define servoPin              10
-  #define micPin                A0
+  #define fireIndicator         40
 
   //Motor pins
   #define leftMotordig           4
@@ -42,13 +41,13 @@
 #define HOMEREACHED           9
 #define FFTSIGNAL             49
 
-#define INITIALIZATION_TIME   5500
+#define INITIALIZATION_TIME   2250
 
 //Wall-follow constants
 #define FRONTOBSTACLEDIST     250
 
 //Line sense & alignment constants
-#define LINESENSING_INVERTED  0     //1 = look for black, 0 = look for white
+#define LINESENSING_INVERTED  1     //1 = look for black, 0 = look for white
 
 #if LINESENSING_INVERTED
   #define LINESENSED            850
@@ -117,7 +116,10 @@ void setup() {
   pinMode(distRightFrontPin,INPUT);
   pinMode(distFrontPin,INPUT);
   pinMode(startButton,INPUT);
+  digitalWrite(startButton,HIGH); //Enable internal pullup
   pinMode(FFTSIGNAL,INPUT);
+  pinMode(fireIndicator,OUTPUT); //Goes high when fire detected
+  digitalWrite(fireIndicator,LOW);
   
   pinMode(13,OUTPUT);
   
@@ -128,7 +130,7 @@ void setup() {
   #endif
   
   //Wait for start button
-  while(false && digitalRead(startButton)==LOW){
+  while(digitalRead(startButton)==HIGH){
     if(millis()%1000==0){
       sensorDiagnostics();
     }
@@ -168,7 +170,7 @@ unsigned long stateStart = 0;
 
 void loop(){
   while(true){
-    //statemachine();
+    statemachine();
     //sensorDiagnostics();
     //delay(1000);
     //testRotation();
@@ -178,7 +180,7 @@ void loop(){
     //testFireFollow();
     //testServo();
     //testSoundDetect();
-    testFFTComm();
+    //testFFTComm();
   }
 }
 
@@ -216,49 +218,6 @@ void testFireSensing(){
   #endif
 }
 
-/*
-volatile int x = 0;
-int count3800 = 0;
-void testSoundDetect(){
-  TIMSK0 = 0; // turn off timer0 for lower jitter
-  ADCSRA = 0xe5; // set the adc to free running mode
-  ADMUX = 0x40; // use adc0
-  DIDR0 = 0x01; // turn off the digital input for adc0
-  while(1) { // reduces jitter
-    cli();  // UDRE interrupt slows this way down on arduino1.0
-    for (int i = 0 ; i < 512 ; i += 2) { // save 256 samples
-      while(!(ADCSRA & 0x10)); // wait for adc to be ready
-      ADCSRA = 0xf5; // restart adc
-      byte m = ADCL; // fetch adc data
-      byte j = ADCH;
-      int k = (j << 8) | m; // form into an int
-      k -= 0x0200; // form into a signed int
-      k <<= 6; // form into a 16b signed int
-      fft_input[i] = k; // put real data into even bins
-      fft_input[i+1] = 0; // set odd bins to 0
-    }
-    fft_window(); // window the data for better frequency response
-    fft_reorder(); // reorder the data before doing the fft
-    fft_run(); // process the data in the fft
-    fft_mag_log(); // take the output of the fft
-    sei();
-    //Serial.println("start");
-    uint8_t amp = fft_log_out[25];
-    if (amp>100) count3800+=1;
-    else count3800=0;
-    if(count3800>5){
-      #if DEBUG
-        Serial.println("3800 Hz");
-       #endif
-    }
-    else{
-      x = 6;
-    }
-    
-  }
-}
-*/
-
 void testFireFollow(){
   fAngle = fireSense.fireAngle();
   fStrength = fireSense.fireStrength();
@@ -287,7 +246,6 @@ void testWallFollow(){
   int rightfront = avgSensorVal(distRightFrontPin,3);
   int rightback = avgSensorVal(distRightBackPin,3);
   int front = avgSensorVal(distFrontPin,3);
-
   mcontrol.drive(rightback,rightfront,255);
   
   if(avgSensorVal(distFrontPin,3)>FRONTOBSTACLEDIST){
@@ -313,13 +271,16 @@ void statemachine() {
   //while(1) Serial.println("Test2");
   switch(STATE){
     case STARTPUSHED:
-      time = 0;
-      startTime = millis();
-      stateStart = 0;
-      STATE = INITIALIZATION;
+      //Wait for start sound
+      if(digitalRead(FFTSIGNAL)){
+        STATE = INITIALIZATION;
+        time = 0;
+        startTime = millis();
+        stateStart = 0;
+      }
       break;
     case INITIALIZATION:
-      //Rotate 90 deg CW at start
+      //Rotate 90 deg CW at start for arbitrary start orientation
       if(!rotatedAtStart){
         rotCW90();
         rotatedAtStart = true;
@@ -330,7 +291,7 @@ void statemachine() {
         rotCCW90();
       }
       //Wall follow
-      mcontrol.drive(analogRead(distRightBackPin),analogRead(distRightFrontPin),180);
+      mcontrol.drive(avgSensorVal(distRightBackPin,3),avgSensorVal(distRightFrontPin,3),255);
       
       //After some seconds, initialization is over, so go to next state
       if(time>=INITIALIZATION_TIME){
@@ -350,7 +311,7 @@ void statemachine() {
       if(avgSensorVal(distFrontPin,3)>FRONTOBSTACLEDIST){
         rotCCW90();
       }
-      mcontrol.drive(analogRead(distRightBackPin),analogRead(distRightFrontPin),180);
+      mcontrol.drive(avgSensorVal(distRightBackPin,3),avgSensorVal(distRightFrontPin,3),255);
       
       
       //Look for lines. If found, brake
