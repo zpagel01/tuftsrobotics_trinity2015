@@ -12,6 +12,8 @@ port at 115.2kb.
 
 #include <FFT.h> // include the library
 
+volatile int x =6;
+
 void setup() {
   Serial.begin(115200); // use the serial port
   TIMSK0 = 0; // turn off timer0 for lower jitter
@@ -19,6 +21,8 @@ void setup() {
   ADMUX = 0x40; // use adc0
   DIDR0 = 0x01; // turn off the digital input for adc0
 }
+
+int count3800 = 0;
 
 void loop() {
   while(1) { // reduces jitter
@@ -41,8 +45,15 @@ void loop() {
     sei();
     //Serial.println("start");
     uint8_t amp = get3800HzAmplitude();
-    Serial.println(amp);
+    if (amp>100) count3800+=1;
+    else count3800=0;
     
+    if (count3800>5){
+      Serial.println(amp);
+    }
+    else{
+      x=6;
+    }
   }
 }
 

@@ -3,19 +3,21 @@
 #include "motor.h"
 #include "motorcontrol.h"
 #include "fireSensorArray.h"
+#include <FFT.h>
 
 //DEFINE ALL PINS HERE
   #define lineSensePin           A5
   #define distRightBackPin      A13
   #define distRightFrontPin     A15
   #define distFrontPin          A14
-  #define fireSensePin1         A9
-  #define fireSensePin2         A11
-  #define fireSensePin3         A8
-  #define fireSensePin4         A12
-  #define fireSensePin5         A10
+  #define fireSensePin1         A1
+  #define fireSensePin2         A3
+  #define fireSensePin3         A6
+  #define fireSensePin4         A4
+  #define fireSensePin5         A2
   #define startButton           8
   #define servoPin              10
+  #define micPin                A0
 
   //Motor pins
   #define leftMotordig           4
@@ -38,6 +40,7 @@
 #define PUTOUTFIRE            6
 #define ALIGNFIRE             7
 #define HOMEREACHED           9
+#define FFTSIGNAL             49
 
 #define INITIALIZATION_TIME   5500
 
@@ -114,6 +117,7 @@ void setup() {
   pinMode(distRightFrontPin,INPUT);
   pinMode(distFrontPin,INPUT);
   pinMode(startButton,INPUT);
+  pinMode(FFTSIGNAL,INPUT);
   
   //Wait for serial to begin
   #if DEBUG
@@ -170,7 +174,9 @@ void loop(){
     //testFireSensing();
     //testLineSensing();
     //testFireFollow();
-    testServo();
+    //testServo();
+    //testSoundDetect();
+    testFFTComm();
   }
 }
 
@@ -193,12 +199,63 @@ void testServo(){
   delay(1000);
 }
 
+void testFFTComm(){
+  if(digitalRead(FFTSIGNAL)){
+    #if DEBUG
+      Serial.println("3800 Hz");
+    #endif
+  }
+}
+
 void testFireSensing(){
   #if DEBUG
     Serial.println(fireSense.fireAngle());
     delay(500);
   #endif
 }
+
+/*
+volatile int x = 0;
+int count3800 = 0;
+void testSoundDetect(){
+  TIMSK0 = 0; // turn off timer0 for lower jitter
+  ADCSRA = 0xe5; // set the adc to free running mode
+  ADMUX = 0x40; // use adc0
+  DIDR0 = 0x01; // turn off the digital input for adc0
+  while(1) { // reduces jitter
+    cli();  // UDRE interrupt slows this way down on arduino1.0
+    for (int i = 0 ; i < 512 ; i += 2) { // save 256 samples
+      while(!(ADCSRA & 0x10)); // wait for adc to be ready
+      ADCSRA = 0xf5; // restart adc
+      byte m = ADCL; // fetch adc data
+      byte j = ADCH;
+      int k = (j << 8) | m; // form into an int
+      k -= 0x0200; // form into a signed int
+      k <<= 6; // form into a 16b signed int
+      fft_input[i] = k; // put real data into even bins
+      fft_input[i+1] = 0; // set odd bins to 0
+    }
+    fft_window(); // window the data for better frequency response
+    fft_reorder(); // reorder the data before doing the fft
+    fft_run(); // process the data in the fft
+    fft_mag_log(); // take the output of the fft
+    sei();
+    //Serial.println("start");
+    uint8_t amp = fft_log_out[25];
+    if (amp>100) count3800+=1;
+    else count3800=0;
+    if(count3800>5){
+      #if DEBUG
+        Serial.println("3800 Hz");
+       #endif
+    }
+    else{
+      x = 6;
+    }
+    
+  }
+}
+*/
 
 void testFireFollow(){
   fAngle = fireSense.fireAngle();
