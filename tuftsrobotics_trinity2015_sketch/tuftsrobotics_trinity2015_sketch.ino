@@ -119,6 +119,8 @@ void setup() {
   pinMode(startButton,INPUT);
   pinMode(FFTSIGNAL,INPUT);
   
+  pinMode(13,OUTPUT);
+  
   //Wait for serial to begin
   #if DEBUG
     while(!Serial);
@@ -201,9 +203,9 @@ void testServo(){
 
 void testFFTComm(){
   if(digitalRead(FFTSIGNAL)){
-    #if DEBUG
-      Serial.println("3800 Hz");
-    #endif
+    while(true){
+      testWallFollow();
+    }
   }
 }
 
@@ -351,7 +353,7 @@ void statemachine() {
       mcontrol.drive(analogRead(distRightBackPin),analogRead(distRightFrontPin),180);
       
       
-      //Look for lines. If found, change state to aligning with line
+      //Look for lines. If found, brake
       #if LINESENSING_INVERTED
         if(analogRead(lineSensePin)>LINESENSED){
       #else

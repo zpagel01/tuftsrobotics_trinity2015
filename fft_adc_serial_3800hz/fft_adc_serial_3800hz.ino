@@ -7,6 +7,8 @@ with the fft. the data is sent out over the serial
 port at 115.2kb.
 */
 
+#define SIGNAL3800   13
+
 #define LOG_OUT 1 // use the log output function
 #define FFT_N 256 // set to 256 point fft
 
@@ -15,7 +17,7 @@ port at 115.2kb.
 volatile int x =6;
 
 void setup() {
-  Serial.begin(115200); // use the serial port
+  pinMode(SIGNAL3800,OUTPUT);
   TIMSK0 = 0; // turn off timer0 for lower jitter
   ADCSRA = 0xe5; // set the adc to free running mode
   ADMUX = 0x40; // use adc0
@@ -45,14 +47,14 @@ void loop() {
     sei();
     //Serial.println("start");
     uint8_t amp = get3800HzAmplitude();
-    if (amp>100) count3800+=1;
+    if (amp>160) count3800+=1;
     else count3800=0;
     
     if (count3800>5){
-      Serial.println(amp);
+      digitalWrite(SIGNAL3800,HIGH);
     }
     else{
-      x=6;
+      digitalWrite(SIGNAL3800,LOW);
     }
   }
 }
