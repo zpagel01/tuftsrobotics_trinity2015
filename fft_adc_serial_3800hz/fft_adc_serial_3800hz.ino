@@ -47,7 +47,7 @@ void loop() {
     sei();
     //Serial.println("start");
     uint8_t amp = get3800HzAmplitude();
-    if (amp>160) count3800+=1;
+    if (amp>190) count3800+=1;
     else count3800=0;
     
     if (count3800>5){
@@ -60,5 +60,10 @@ void loop() {
 }
 
 int get3800HzAmplitude(){
-  return fft_log_out[25]; //Get bucket 25, 3800Hz
+  int max = 0;
+  for(int bin = 23; bin <= 27; bin++){
+    int amp = fft_log_out[bin]; //Get bucket 25, 3800Hz
+    if(amp > max) max = amp;
+  }
+  return max;
 }
