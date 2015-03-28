@@ -3,7 +3,7 @@
 #include "Arduino.h"
 
 #define NUMFIRESENSORS  5
-#define FIRETHRESHOLD   70
+#define FIRETHRESHOLD   34
 
 class FireSensorArray{
 	public:

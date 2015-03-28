@@ -18,7 +18,12 @@ void Motor::flip(){
 	flipped = !flipped;
 }
 
+int Motor::getSpeed(){
+	return this->speed;
+}
+
 void Motor::drive(int speed){
+        this->speed = speed;
 	if(speed>255)  speed=255;
 	if(speed<-255) speed=-255;
 	if(speed>=0) isForward = true;

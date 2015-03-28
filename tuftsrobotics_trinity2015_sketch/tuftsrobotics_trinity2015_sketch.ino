@@ -17,6 +17,7 @@
   #define startButton           12
   #define servoPin              10
   #define fireIndicator         40
+  #define FFTSIGNAL             49
 
   //Motor pins
   #define leftMotordig           4
@@ -27,7 +28,9 @@
 
 //IS SERIAL COMM NEEDED?
 //THIS FUCKS UP TIMING SOM'M BAD
-#define DEBUG                 1
+#define DEBUG                 0
+
+#define WAITFOR3800HZ         0
 
 //Possible States
 #define STARTPUSHED           8
@@ -39,18 +42,19 @@
 #define PUTOUTFIRE            6
 #define ALIGNFIRE             7
 #define HOMEREACHED           9
-#define FFTSIGNAL             49
+#define DRIVETOFIRE           10
+
 
 #define INITIALIZATION_TIME   2250
 
 //Wall-follow constants
-#define FRONTOBSTACLEDIST     250
+#define FRONTOBSTACLEDIST     150
 
 //Line sense & alignment constants
 #define LINESENSING_INVERTED  1     //1 = look for black, 0 = look for white
 
 #if LINESENSING_INVERTED
-  #define LINESENSED            850
+  #define LINESENSED            650
 #else
   #define LINESENSED            45
 #endif
@@ -58,10 +62,11 @@
 
 //Fire sensing constants
 #define FIRESENSED            34
-#define FIRECLOSE             530
+#define FIRECLOSE             300
 #define FIREANGLETHRESH       4
-#define FIRESWEEPTIME         200
+#define FIRESWEEPTIME         1900
 #define FIRESENSE_TRIALS      10
+#define SWEEPSPEED            120
 
 //Motor controller object
 //(motorcontrol.h)
@@ -73,7 +78,7 @@ FireSensorArray fireSense;
 
 //EXTINGUISHER SERVO CONSTANTS
 #define SERVO_LOOSE           40
-#define SERVO_TAUT            90
+#define SERVO_TAUT            140
 
 
 //Motor objects
@@ -108,7 +113,7 @@ void setup() {
   
   
   #if DEBUG
-    Serial.begin(9600);
+    Serial.begin(115200);
   #endif
   
   pinMode(lineSensePin,INPUT);
@@ -129,9 +134,18 @@ void setup() {
     Serial.println("Comm ready");
   #endif
   
-  //Wait for start button
-  while(digitalRead(startButton)==HIGH){
-    if(millis()%1000==0){
+  //Wait for start button to be pressed
+  unsigned long lastPrintTime = millis();
+  while(debounce(startButton)==HIGH){
+    if(millis() - lastPrintTime >=1000){
+      lastPrintTime = millis();
+      sensorDiagnostics();
+    }
+  }
+  //...and then wait to be release again
+  while(debounce(startButton)==LOW){
+    if(millis() - lastPrintTime >=1000){
+      lastPrintTime = millis();
       sensorDiagnostics();
     }
   }
@@ -147,15 +161,18 @@ int lineVal;
 //END DECLARATIONS FOR LINE ADJUSTMENT
 
 //These declarations are for fire sensing
-int fire_motinertia = 120;//140;
-int fire_motcorrection = 3;
+int fire_motinertia = 110;//140;
+int fire_rot_inertia = 0;
+int fire_motcorrection = 8;
 int fAngle = 0;
 int fStrength = 0;
+int fMiddleStrength = 0;
 int maxFireStrength = 0;
 int curFireStrength = 0;
 boolean maxFireFound = false;
-int fireStrengthSum = 0;
-int fireStrengthAvg = 0;
+long fireStrengthSum = 0;
+long fireStrengthAvg = 0;
+bool fireSensed = false;
 //END DECLARATIONS FOR FIRE SENSING
 
 boolean rotatedAtStart = false;
@@ -167,6 +184,7 @@ int numRoomsChecked = 0;
 unsigned long time = 0;
 unsigned long startTime = millis();
 unsigned long stateStart = 0;
+unsigned long sweepStartTime = 0;
 
 void loop(){
   while(true){
@@ -190,7 +208,9 @@ void testServo(){
   {                                  // in steps of 1 degree 
     pullServo.write(pos);              // tell servo to go to position in variable 'pos' 
     delay(8);                       // waits 15ms for the servo to reach the position
-    Serial.println(pos);
+    #if DEBUG
+      Serial.println(pos);
+    #endif
   }
   delay(1000);
   
@@ -198,7 +218,9 @@ void testServo(){
   {                                
     pullServo.write(pos);              // tell servo to go to position in variable 'pos' 
     delay(8);                       // waits 15ms for the servo to reach the position 
-    Serial.println(pos);
+    #if DEBUG
+      Serial.println(pos);
+    #endif
   }
   delay(1000);
 }
@@ -271,8 +293,8 @@ void statemachine() {
   //while(1) Serial.println("Test2");
   switch(STATE){
     case STARTPUSHED:
-      //Wait for start sound
-      if(digitalRead(FFTSIGNAL)){
+      //Wait for start sound, only if WAITFOR3800HZ not set
+      if( !WAITFOR3800HZ || digitalRead(FFTSIGNAL) || debounce(startButton)==LOW){ //If sound heard or not waiting for sound or button pressed again
         STATE = INITIALIZATION;
         time = 0;
         startTime = millis();
@@ -324,6 +346,11 @@ void statemachine() {
           leftMotor.brake();
           numRoomsChecked++;
           STATE = INROOM;
+          leftMotor.drive(180);
+          rightMotor.drive(180);
+          delay(500);
+          rightMotor.brake();
+          leftMotor.brake();
           stateStart = time;
           #if DEBUG
             Serial.println("Changed state to INROOM");
@@ -333,26 +360,51 @@ void statemachine() {
       break;
       
     case INROOM:
-      fireStrengthSum = 0;
-      for(int i=0; i<FIRESENSE_TRIALS; i++){
-        fireStrengthSum += fireSense.fireStrength();
-        delay(1);
+      
+      fireSensed = false;
+      
+      sweepStartTime = millis();
+      while (millis() - sweepStartTime < FIRESWEEPTIME){
+        fireStrengthSum = 0;
+        //Switch direction halfway
+        if (millis() - sweepStartTime > FIRESWEEPTIME/3){
+          leftMotor.drive(-SWEEPSPEED);
+          rightMotor.drive(SWEEPSPEED);
+        }
+        else{
+          leftMotor.drive(SWEEPSPEED);
+          rightMotor.drive(-SWEEPSPEED);
+        }
+        
+        for(int i = 0; i < FIRESENSE_TRIALS; i++){
+          fireStrengthSum += fireSense.fireStrength();
+        }
+        
+        fireStrengthAvg = fireStrengthSum / (FIRESENSE_TRIALS);
+        #if DEBUG
+          Serial.println(fireStrengthAvg);
+        #endif
+        
+        if (fireStrengthAvg > FIRESENSED){
+          STATE = FOUNDFIRE;
+          digitalWrite(fireIndicator,HIGH);
+          int lspeed = leftMotor.getSpeed();
+          int rspeed = rightMotor.getSpeed();
+          leftMotor.brake();
+          rightMotor.brake();
+          delay(300);
+          fireSensed = true;
+          break;
+        }
       }
-      fireStrengthAvg = fireStrengthSum / FIRESENSE_TRIALS;
       #if DEBUG
         Serial.println(fireStrengthAvg);
         delay(400);
       #endif
-      if(fireStrengthAvg>=FIRESENSED){
-        STATE = FOUNDFIRE;
-        //Avoid hitting corner if fire is in corner
-        leftMotor.drive(200);
-        rightMotor.drive(200);
-        delay(800);
-        leftMotor.brake();
-        rightMotor.brake();
-      }
-      else{
+      
+      if(!fireSensed)
+      {
+        //If we get here, didn't find fire
         leaveRoom();
         STATE = WALLFOLLOW;
       }
@@ -365,72 +417,68 @@ void statemachine() {
       //TRIGGER CO2
       //STATE = RETURNHOME;
       fAngle = fireSense.fireAngle();
-      fStrength = fireSense.fireStrength();
+      fMiddleStrength = avgSensorVal(fireSensePin3,FIRESENSE_TRIALS);
       
       
       //if(abs(fAngle)>=7){
+        fire_rot_inertia = fire_motcorrection*fAngle;
+        if (fire_rot_inertia<100){
+          fire_rot_inertia = 100;
+        }
         if(fAngle > FIREANGLETHRESH)
         {
-          leftMotor.drive(fire_motinertia + fire_motcorrection);
-          rightMotor.drive(fire_motinertia - fire_motcorrection);
+          leftMotor.drive(fire_rot_inertia);
+          rightMotor.drive(-fire_rot_inertia);
         }
         else if(fAngle < -FIREANGLETHRESH){
-          leftMotor.drive(fire_motinertia - fire_motcorrection);
-          rightMotor.drive(fire_motinertia + fire_motcorrection);
+          leftMotor.drive(-fire_rot_inertia);
+          rightMotor.drive(fire_rot_inertia);
         }
         else{
           leftMotor.drive(fire_motinertia);
           rightMotor.drive(fire_motinertia);
         }
         
-        if(fStrength>=FIRECLOSE){
+        if(fAngle < FIREANGLETHRESH && fAngle > -FIREANGLETHRESH){
           leftMotor.brake();
           rightMotor.brake();
-          STATE = PUTOUTFIRE;
+          STATE = DRIVETOFIRE;
           stateStart = time;
         }
       //}
       
       break;
       
-    case ALIGNFIRE:
-    //Rotate until maximum read on middle fire sensor
-      //Sweep left
-      if(time-stateStart<FIRESWEEPTIME)
-      {
-        leftMotor.drive(100);
-        rightMotor.drive(-100);
-        curFireStrength = fireSense.fireStrength();
-        if(maxFireStrength<curFireStrength){
-          maxFireStrength=curFireStrength;
+    case DRIVETOFIRE:
+    
+      fAngle = fireSense.fireAngle();
+      fMiddleStrength = avgSensorVal(fireSensePin3,FIRESENSE_TRIALS);
+      
+      
+      
+      //if(abs(fAngle)>=7){
+        if(fAngle > FIREANGLETHRESH)
+        {
+          leftMotor.drive(fire_motinertia + fire_motcorrection*fAngle);
+          rightMotor.drive(fire_motinertia - fire_motcorrection*fAngle);
         }
-      }
-      //Sweep right
-      else if(time-stateStart<FIRESWEEPTIME*3){
-        leftMotor.drive(-100);
-        rightMotor.drive(100);
-        curFireStrength = fireSense.fireStrength();
-        if(maxFireStrength<curFireStrength){
-          maxFireStrength=curFireStrength;
-        }
-      }
-      //Turn left slowly until max is reached,
-      //ideally pointing right at fire
-      else{
-        if(fireSense.fireStrength()<maxFireStrength && !maxFireFound){
-          leftMotor.drive(70);
-          rightMotor.drive(-70);
+        else if(fAngle < -FIREANGLETHRESH){
+          leftMotor.drive(fire_motinertia - fire_motcorrection*fAngle);
+          rightMotor.drive(fire_motinertia + fire_motcorrection*fAngle);
         }
         else{
-          maxFireFound = true;
+          leftMotor.drive(fire_motinertia);
+          rightMotor.drive(fire_motinertia);
+        }
+        
+        if(fMiddleStrength>=FIRECLOSE){
           leftMotor.brake();
           rightMotor.brake();
           STATE = PUTOUTFIRE;
           stateStart = time;
         }
-      }
     
-      break;
+    break;
       
       
     case PUTOUTFIRE:
@@ -492,8 +540,9 @@ void sensorDiagnostics(){
     
     Serial.println();
     
+    int angle = fireSense.fireAngle();
     Serial.print("FIRE SENSOR - Angle:             ");
-    Serial.println(fireSense.fireAngle());
+    Serial.println(angle);
     
     Serial.print("FIRE SENSOR - Strength:          ");
     Serial.println(fireSense.fireStrength());
@@ -519,29 +568,36 @@ void sensorDiagnostics(){
 
 //Rotate clockwise 90 degrees
 void rotCW90(){
-  leftMotor.drive(150);
-  rightMotor.drive(-150);
-  delay(550);
+  leftMotor.drive(200);
+  rightMotor.drive(-200);
+  delay(650);
   leftMotor.brake();
   rightMotor.brake();
 }
 
 //Rotate counterclockwise 90 degrees
 void rotCCW90(){
-  leftMotor.drive(-150);
-  rightMotor.drive(150);
-  delay(630);
+  leftMotor.drive(-200);
+  rightMotor.drive(200);
+  delay(600);
   leftMotor.brake();
   rightMotor.brake();
 }
 
 void leaveRoom(){
-  leftMotor.drive(-255);
-  rightMotor.drive(255);
-  delay(1800);
-  leftMotor.drive(250);
-  rightMotor.drive(250);
-  delay(1200);
+  //Rotate 180, go forward, rot cw, go forward if possible
+  leftMotor.drive(-180);
+  rightMotor.drive(180);
+  delay(900);
+  leftMotor.drive(200);
+  rightMotor.drive(200);
+  delay(800);
+  rotCW90();
+  if(avgSensorVal(distFrontPin,3)<FRONTOBSTACLEDIST){
+    leftMotor.drive(250);
+    rightMotor.drive(250);
+    delay(200);
+  }
   leftMotor.brake();
   rightMotor.brake();
 }
@@ -551,13 +607,16 @@ void extinguish(){
   for(pos = SERVO_LOOSE; pos <= SERVO_TAUT; pos += 1) // goes from 0 degrees to 180 degrees 
   {                                  // in steps of 1 degree 
     pullServo.write(pos);              // tell servo to go to position in variable 'pos' 
-    delay(8);                       // waits 15ms for the servo to reach the position 
+    delay(4);                       // waits 15ms for the servo to reach the position 
   }
+  
+  while(fireSense.fireStrength() > FIRESENSED){;}
+  delay(50);
   
   for(pos = SERVO_TAUT; pos>=SERVO_LOOSE; pos -= 1)     // goes from 180 degrees to 0 degrees 
   {                                
     pullServo.write(pos);              // tell servo to go to position in variable 'pos' 
-    delay(8);                       // waits 15ms for the servo to reach the position 
+    delay(4);                       // waits 15ms for the servo to reach the position 
   }
   
   //pullServo.write(SERVO_LOOSE); 
@@ -571,3 +630,16 @@ int avgSensorVal(int pin, int trials){
   return sum/trials;
 }
 
+int debounce(int pin){
+  int start = millis();
+  int debounceDelay = 5;
+  int initial = digitalRead(pin);
+  while(millis() - start < debounceDelay){
+    int cur = digitalRead(pin);
+    if (cur!=initial){
+      initial = cur;
+      start = millis();
+    }
+  }
+  return initial;
+}

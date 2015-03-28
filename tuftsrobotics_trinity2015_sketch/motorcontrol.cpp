@@ -78,7 +78,7 @@ void MotorControl::drive(int p_left, int p_right, int inertia){
       int dist_from_opt = OPT - min(p_left,p_right); //dist_from_opt negative when too close
       int angle = p_right - p_left; //angle positive when pointed at wall
       int ideal_angle = 0.8 * dist_from_opt; //scale??
-      if (ideal_angle >0) ideal_angle = 0.03 * (ideal_angle*ideal_angle);
+      if (ideal_angle >0) ideal_angle = 0.03 * pow(ideal_angle,1.8);
       if (ideal_angle >200) ideal_angle = 200;
       #if DEBUG
         Serial.println(ideal_angle);

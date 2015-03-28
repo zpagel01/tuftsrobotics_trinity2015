@@ -14,11 +14,13 @@ class Motor{
       	void drive(int speed);
       	void brake();
 	boolean isMovingForward();
+        int getSpeed();
 
     private:
         int digPin;
         int pwmPin;
 	boolean flipped;
         boolean isForward;
+        int speed;
 };
 #endif MOTOR_H
