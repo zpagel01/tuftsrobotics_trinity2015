@@ -30,7 +30,7 @@
 //THIS FUCKS UP TIMING SOM'M BAD
 #define DEBUG                 0
 
-#define WAITFOR3800HZ         0
+#define WAITFOR3800HZ         1
 
 //Possible States
 #define STARTPUSHED           8
@@ -48,10 +48,11 @@
 #define INITIALIZATION_TIME   2250
 
 //Wall-follow constants
-#define FRONTOBSTACLEDIST     150
+#define FRONTOBSTACLEDIST     190
+#define WALLONRIGHT           130
 
 //Line sense & alignment constants
-#define LINESENSING_INVERTED  1     //1 = look for black, 0 = look for white
+#define LINESENSING_INVERTED  0     //1 = look for black, 0 = look for white
 
 #if LINESENSING_INVERTED
   #define LINESENSED            650
@@ -61,8 +62,8 @@
 
 
 //Fire sensing constants
-#define FIRESENSED            34
-#define FIRECLOSE             300
+#define FIRESENSED            60
+#define FIRECLOSE             280
 #define FIREANGLETHRESH       4
 #define FIRESWEEPTIME         1900
 #define FIRESENSE_TRIALS      10
@@ -137,14 +138,14 @@ void setup() {
   //Wait for start button to be pressed
   unsigned long lastPrintTime = millis();
   while(debounce(startButton)==HIGH){
-    if(millis() - lastPrintTime >=1000){
+    if(millis() - lastPrintTime >=500){
       lastPrintTime = millis();
       sensorDiagnostics();
     }
   }
   //...and then wait to be release again
   while(debounce(startButton)==LOW){
-    if(millis() - lastPrintTime >=1000){
+    if(millis() - lastPrintTime >=500){
       lastPrintTime = millis();
       sensorDiagnostics();
     }
@@ -163,7 +164,7 @@ int lineVal;
 //These declarations are for fire sensing
 int fire_motinertia = 110;//140;
 int fire_rot_inertia = 0;
-int fire_motcorrection = 8;
+int fire_motcorrection = 6;
 int fAngle = 0;
 int fStrength = 0;
 int fMiddleStrength = 0;
@@ -348,7 +349,7 @@ void statemachine() {
           STATE = INROOM;
           leftMotor.drive(180);
           rightMotor.drive(180);
-          delay(500);
+          delay(450);
           rightMotor.brake();
           leftMotor.brake();
           stateStart = time;
@@ -360,6 +361,8 @@ void statemachine() {
       break;
       
     case INROOM:
+    
+      numRoomsChecked++;
       
       fireSensed = false;
       
@@ -425,6 +428,9 @@ void statemachine() {
         if (fire_rot_inertia<100){
           fire_rot_inertia = 100;
         }
+        if (fire_rot_inertia>160){
+          fire_rot_inertia = 160;
+        }
         if(fAngle > FIREANGLETHRESH)
         {
           leftMotor.drive(fire_rot_inertia);
@@ -477,6 +483,12 @@ void statemachine() {
           STATE = PUTOUTFIRE;
           stateStart = time;
         }
+        
+        //Timeout, so if we get stuck on a wall, we try to extinguish anyway
+        if(time - stateStart > 3000){
+          STATE = PUTOUTFIRE;
+        }
+        
     
     break;
       
@@ -518,7 +530,7 @@ void sensorDiagnostics(){
   #if DEBUG
     Serial.println("------------Printing robot information------------");
     
-    Serial.print("LINE SENSOR - Left:            ");
+    Serial.print("LINE SENSOR:            ");
     Serial.println(analogRead(lineSensePin));
     
     Serial.println();
@@ -568,18 +580,18 @@ void sensorDiagnostics(){
 
 //Rotate clockwise 90 degrees
 void rotCW90(){
-  leftMotor.drive(200);
-  rightMotor.drive(-200);
-  delay(650);
+  leftMotor.drive(180);
+  rightMotor.drive(-220);
+  delay(500);
   leftMotor.brake();
   rightMotor.brake();
 }
 
 //Rotate counterclockwise 90 degrees
 void rotCCW90(){
-  leftMotor.drive(-200);
-  rightMotor.drive(200);
-  delay(600);
+  leftMotor.drive(-220);
+  rightMotor.drive(180);
+  delay(400);
   leftMotor.brake();
   rightMotor.brake();
 }
@@ -588,15 +600,16 @@ void leaveRoom(){
   //Rotate 180, go forward, rot cw, go forward if possible
   leftMotor.drive(-180);
   rightMotor.drive(180);
-  delay(900);
+  delay(700);
   leftMotor.drive(200);
   rightMotor.drive(200);
   delay(800);
-  rotCW90();
-  if(avgSensorVal(distFrontPin,3)<FRONTOBSTACLEDIST){
+  if(avgSensorVal(distRightBackPin,3)<WALLONRIGHT && avgSensorVal(distRightFrontPin,3)<WALLONRIGHT){
+    rotCW90();
+    delay(100);
     leftMotor.drive(250);
     rightMotor.drive(250);
-    delay(200);
+    delay(500);
   }
   leftMotor.brake();
   rightMotor.brake();
